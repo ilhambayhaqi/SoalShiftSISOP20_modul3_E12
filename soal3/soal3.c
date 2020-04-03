@@ -187,7 +187,14 @@ int main(int argc, char const *argv[]){
 		closedir(directory);
 	}
 	else if(argc > 2 && !strcmp(argv[1], "-f")){
-
+		for(int i=2, i < argc, ++i){
+			DIR* directory = opendir(argv[i]);
+			if(!directory){
+				if(pthread_create( &tid[counter], NULL, categorize, (void*) fullPath) != 0){
+					printf("Cannot create thread\n");
+				}
+			}
+		}
 	}	
 	return 0;
 }
