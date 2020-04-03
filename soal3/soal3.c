@@ -142,7 +142,8 @@ int main(int argc, char const *argv[]){
 		closedir(directory);
 	}
 	else if(argc == 3 && !strcmp(argv[1], "-d")){
-		DIR* directory = opendir(argv[2]);
+		chdir(argv[2]);
+		DIR* directory = opendir(".");
 		DIR* isDir;
 		struct dirent *ls;
 
@@ -151,7 +152,7 @@ int main(int argc, char const *argv[]){
 			while(ls = readdir(directory)){
 				if(strcmp(ls->d_name, ".") && strcmp(ls->d_name, "..")){
 					char fullPath[1024];
-					sprintf(fullPath,"%s/%s", argv[2],ls->d_name);
+					sprintf(fullPath,"%s/%s", workdir,ls->d_name);
 					isDir = opendir(fullPath);
 					if(!isDir){
 						//printf("%s\n", fullPath);
@@ -170,10 +171,10 @@ int main(int argc, char const *argv[]){
 			while(ls = readdir(directory)){
 				if(strcmp(ls->d_name, ".") && strcmp(ls->d_name, "..")){
 					char fullPath[1024];
-					sprintf(fullPath,"%s/%s", argv[2],ls->d_name);
+					sprintf(fullPath,"%s/%s", workdir,ls->d_name);
 					isDir = opendir(fullPath);
 					if(!isDir){
-						//printf("%s\n", fullPath);
+						printf("%s\n", fullPath);
 						if(pthread_create( &tid[counter], NULL, categorize, (void*) fullPath) != 0){
 							printf("Cannot create thread\n");
 						}
