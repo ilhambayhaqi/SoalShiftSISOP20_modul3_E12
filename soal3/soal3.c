@@ -24,6 +24,7 @@ void *categorize(void* argument){
 	pthread_t id = pthread_self();
 	//printf("fullPath : %s\n", fullPath);
 
+	printf("hehe\n");
 
 	char *str = strtok(fullPath, "/");
 	int i = 0;
@@ -187,13 +188,16 @@ int main(int argc, char const *argv[]){
 		closedir(directory);
 	}
 	else if(argc > 2 && !strcmp(argv[1], "-f")){
-		for(int i=2, i < argc, ++i){
-			DIR* directory = opendir(argv[i]);
-			if(!directory){
-				if(pthread_create( &tid[counter], NULL, categorize, (void*) fullPath) != 0){
+		pthread_t tid[argc];
+		for(int i=2; i < argc; ++i){
+			FILE* directory= fopen(argv[i], "r");
+			if(directory){
+				printf("%s\n", argv[i]);
+				if(pthread_create( &tid[i-2], NULL, categorize, (void*) argv[i]) != 0){
 					printf("Cannot create thread\n");
 				}
 			}
+			fclose(directory);
 		}
 	}	
 	return 0;
