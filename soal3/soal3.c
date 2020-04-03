@@ -81,16 +81,14 @@ void *categorize(void* argument){
 	}
 
 	char newpath[256], oldpath[256];
-	sprintf(oldpath,"\"./%s\"", temp);
-	sprintf(newpath,"\"./%s/%s\"", extension, temp);
+	sprintf(oldpath,"./%s", temp);
+	sprintf(newpath,"./%s/%s", extension, temp);
 
 	printf("oldpath : %s\n", oldpath);
 	printf("newpath : %s\n", newpath);
 
 
-	if(rename(oldpath, newpath)){
-
-	}
+	rename(oldpath, newpath);
 	//printf("extension : %s\n", extension);
 
 }
