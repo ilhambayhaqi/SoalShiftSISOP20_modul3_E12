@@ -8,7 +8,7 @@ No4. Belum ada kendala
 ## Soal 2
 
 Pada soal 2 terdapat code yaitu untuk server dan client.
-- Untuk Client
+- Untuk Client  
 Pada client awalnya dilakukan koneksi ke server, bila berhasil kemudian diinisialisasi screen menjadi 1 menunjukkan saat ini berada pada screen 1 dengan auth "Belum Login".
 ```
 int fd;
@@ -154,9 +154,180 @@ returnAttr();
 		
 ```
 
+- Untuk Server  
+Pada server awalnya dikalukan konfigurasi sebagai berikut.
+```
+int server_fd, new_socket, valread, activity, sd, max_sd;
+char buffer[1024] = {0};
+int opt = 1;
+struct sockaddr_in address;
+int addrlen = sizeof(address)
+fd_set readfds;
 
+pthread_t tid[max_client];
 
-- Untuk Server
+memset(busy, false, sizeof(busy));
+memset(client_socket, 0, sizeof(client_socket));
+
+memset(health, 0 , sizeof(health));
+
+if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+  perror("socket failed");
+  exit(EXIT_FAILURE);
+}
+      
+if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+  perror("setsockopt");
+  exit(EXIT_FAILURE);
+}
+
+address.sin_family = AF_INET;
+address.sin_addr.s_addr = INADDR_ANY;
+address.sin_port = htons( PORT );
+      
+if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0) {
+  perror("bind failed");
+  exit(EXIT_FAILURE);
+}
+```
+Kemudian setelah konfigurasi selesai dilakukan looping dan listen. Pada awalnya telah disediakan set untuk file descriptor. Awalnya dilakukan insert pada fd server kemudian untuk setiap client yang berhasil terkoneksi juga akan dilakukan insert. Set ini digunakan apabila terjadi perubahan pada fd client (FD_ISSET menjadi true) maka akan dieksekusi oleh server. Kemudian untuk tiap client dibuat thread untuk menangani request dari tiap socket dan agar tidak ada create yang dobel, maka diberikan boolean array busy dimana bila busy[i] adalah true maka thread i tidak akan di create lagi sehingga tidak mengakses variabel yang sama.
+
+```
+while(true){
+	if (listen(server_fd, 3) < 0) {
+	perror("listen");
+	exit(EXIT_FAILURE);
+	}
+
+	FD_ZERO(&readfds);
+	FD_SET(server_fd, &readfds);
+	max_sd = server_fd;
+
+	for(int i=0; i < max_client; ++i){
+  		sd = client_socket[i];
+  		if(sd > 0) FD_SET(sd, &readfds);
+  		if(sd > max_sd) max_sd = sd;
+	}
+
+	activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
+	if ((activity < 0) && (errno!=EINTR)){   
+  		printf("Select error\n");   
+	}	 
+
+	if(FD_ISSET(server_fd, &readfds)){
+  		if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0) {
+    			perror("accept");
+    			exit(EXIT_FAILURE);
+    
+    		for(int i = 0; i < max_client; i++){
+    			if(!client_socket[i]){
+      				client_socket[i] = new_socket;
+      				break;
+    			}
+  		}
+	}
+
+	for(int i=0; i < max_client; i++){
+  		sd = client_socket[i];
+    		if(FD_ISSET(sd, &readfds)){
+    			int currPos = i;
+ 	   		sock *passing = malloc(sizeof *passing);
+    			passing->i = &currPos;
+    			if(!busy[i]){
+      				busy[i] = true;
+      				pthread_create(&tid[currPos], NULL, action, passing);
+      			}
+    		}
+    	}
+}
+```
+Tiap thread yang dibentuk menangani proses read dan send dari/ke satu client socket. Request yang mungkin ada adalah register, login, dan find.  
+Untuk register maka akan membuka file akun.txt dalam mode append+, kemudian membaca username dan password dari client socket. Dari read tersebut dijadikan ke dalam struct Auth dan dilakukan fwrite. Kemudian karena pada soal diminta untuk menampilkan seluruh akun yang telah terdaftar maka dilakukan fread hingga pada akun.txt
+```
+FILE *database = fopen("akun.txt","a+");
+if(!strcmp(buffer, "registerRequest")){
+	Auth userBuff;
+	Auth dataAccount;
+	memset(userBuff.username, '\0', sizeof(userBuff.username));
+	memset(userBuff.password, '\0', sizeof(userBuff.password));
+
+       	read(client_socket[i], userBuff.username, 256);
+        read(client_socket[i], userBuff.password, 256);
+
+        fwrite(&userBuff, sizeof(Auth), 1, database);
+        printf("Register Success\n");
+	fclose(database);
+	
+	FILE *data = fopen("akun.txt","r");
+	while(fread(&dataAccount, sizeof(Auth), 1, data)){
+		printf("username: %s\nPassword: %s\n\n", dataAccount.username, dataAccount.password);
+	}
+}
+```
+Untuk login, hampir sama dengan register namun pada freadnya dilakukan pembandingan, bila cocok maka bool login menjadi true dan akan mengirimkan "authSuccess" pada client. Bila gagal akan mengirim "authFailed" pada client.
+```
+bool login = false;
+while(fread(&dataAccount, sizeof(Auth), 1, database)){
+        if(!strcmp(dataAccount.username, userBuff.username) 
+      	&& !strcmp(dataAccount.password, userBuff.password)){
+        	login = true;
+        	break;
+        }
+}
+
+if(login){
+        char *authSuccess = "authSuccess";
+        send(client_socket[i], authSuccess, strlen(authSuccess), 0);
+       	printf("Auth Success\n");
+}
+else{
+        char *authFailed = "authFailed";
+        send(client_socket[i], authFailed, strlen(authFailed), 0);
+        printf("Auth Failed\n");
+}
+fclose(database);
+```
+Untuk request find player, maka health akan diset menjadi 100, dan akan melakukan looping mencari lawan yang belum ada pasangan (opponentnya -1) dan healthnya 100. Bila sudah mendapat pasangan maka opponent dari tiap no socket akan diset menjadi no socket lawannya dan memasuki fase play.
+
+```
+else if(!strcmp(buffer, "findPlayer")){
+	health[i] = 100;
+	
+	while(opponent[i] == -1){
+		for(int j=0; j< max_client; j++){
+		if(opponent[j] == -1 && health[j] == 100 && j != i){
+			opponent[i] = j;
+                        opponent[j] = i;
+                        break;
+		}
+	}
+}
+```
+Saat sudah play maka server mengirim status play pada client ```send(client_socket[i], Status, strlen(Status), 0);``` dan server akan membaca input dari client serta mengirimkan status bila telah ada pemenang. Setelah menang maka thread akan di sleep terlebih dahulu agar ada delay pada set opponent dan health agar hasil menang dan kalah tidak berubah.
+```
+while(true){
+  memset(readBuff, '\0', sizeof(readBuff));
+  read(client_socket[i], readBuff, 256);
+  if(!strcmp(readBuff, "gameover")) break;
+  if(!strcmp(readBuff, " ")){
+      health[opponent[i]] -= 10;
+      sprintf(life, "%d", health[opponent[i]]);
+      send(client_socket[opponent[i]], life, strlen(life), 0);
+  }
+  if(health[opponent[i]] <= 0){
+      send(client_socket[i], Win, strlen(Win), 0);
+      send(client_socket[opponent[i]], Lose, strlen(Lose), 0);
+      printf("Send Win\n");
+      break;
+  }
+}
+
+sleep(2);
+opponent[i] = -1;
+health[i] = 0;
+```
+Setelah tidak ada perubahan pada fd client maka thread akan di exit dan busy menjadi false agar dapat dibentuk thread lagi.
+
 
 ## Soal 3
 
