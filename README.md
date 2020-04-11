@@ -1,9 +1,7 @@
 # SoalShiftSISOP20_modul3_E12
-Kendala  
+Kendala
+## Soal 1
 No1. Masih bingung soalnya dan belum bisa membuat  
-No2. Baru sampai login dan register  
-No3. Belum selesai baru yang argumen *  
-No4. Belum ada kendala
 
 ## Soal 2
 
@@ -328,6 +326,13 @@ health[i] = 0;
 ```
 Setelah tidak ada perubahan pada fd client maka thread akan di exit dan busy menjadi false agar dapat dibentuk thread lagi.
 
+![Screenshot from 2020-04-11 22-04-06](https://user-images.githubusercontent.com/57692117/79047429-a4089b00-7c40-11ea-8275-f137523bb57b.png)
+![Screenshot from 2020-04-11 22-04-24](https://user-images.githubusercontent.com/57692117/79047431-a66af500-7c40-11ea-9a8e-98a678da64df.png)
+![Screenshot from 2020-04-11 22-04-35](https://user-images.githubusercontent.com/57692117/79047432-a834b880-7c40-11ea-9cc1-cb4312d11d32.png)
+![Screenshot from 2020-04-11 22-04-59](https://user-images.githubusercontent.com/57692117/79047433-a965e580-7c40-11ea-867f-ba307c32ecb4.png)
+
+Kendala  
+- Sulit untuk melakukan sinkronisasi client dan server
 
 ## Soal 3
 
@@ -520,6 +525,13 @@ sprintf(newpath,"./%s/%s", extension, temp);
 rename(oldpath, newpath);
 ```
 
+![Screenshot from 2020-04-11 22-11-20](https://user-images.githubusercontent.com/57692117/79047542-7112d700-7c41-11ea-9d5b-d8ea04779fe5.png)
+![Screenshot from 2020-04-11 22-10-45](https://user-images.githubusercontent.com/57692117/79047540-6eb07d00-7c41-11ea-9995-3a8eb6f77d7a.png)
+
+Kendala :
+- Kurang waktu saat pengerjaan
+- Kemarin sulit saat parsing string
+
 ## Soal 4
 ### 4a. Perkalian matrix
 Pada awalnya matriks didefinisikan secara manual pada source code, kemudian dibuat thread untuk melakukan perkalian untuk setiap elemen pada matrix res (sejumlah baris dan kolom pada res), fungsi perkaliannya sebagai berikut. Agar mudah maka tiap matrix dideklarasikan pada variabel global. Untuk fungsi perkaliannya sebagai berikut.
@@ -597,3 +609,7 @@ Sedangkan untuk wc, STDIN akan didup pada fd[0] dan fd[1] diclose.
         execv("/usr/bin/wc", arg); 
     }
  ```
+![Screenshot from 2020-04-11 22-08-43](https://user-images.githubusercontent.com/57692117/79047486-0bbee600-7c41-11ea-8626-deffa5d6f157.png)
+
+Kendala  
+- Belum ada kendala yang berarti
