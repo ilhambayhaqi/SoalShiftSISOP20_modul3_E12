@@ -16,15 +16,22 @@
 #include<wait.h>
 #include<pthread.h> 
 #include<sys/stat.h>
+#include<libgen.h>
 
 char workdir[256];
+
+bool is_file(const char* path){
+	struct stat buff;
+	stat(path, &buff);
+	return S_ISREG(buff.st_mode);
+}
 
 void *categorize(void* argument){
 	char *fullPath = (char *) argument;
 	pthread_t id = pthread_self();
 	//printf("fullPath : %s\n", fullPath);
 
-	printf("hehe\n");
+	//printf("hehe\n");
 
 	char *str = strtok(fullPath, "/");
 	int i = 0;
@@ -49,6 +56,7 @@ void *categorize(void* argument){
 	//printf("filename : %s\n", filename);
 
 	char extension[64];
+	memset(extension, '\0', sizeof(extension));
 
 	i=0;
 	str = strtok(filename, ".");
@@ -84,8 +92,8 @@ void *categorize(void* argument){
 	sprintf(oldpath,"./%s", temp);
 	sprintf(newpath,"./%s/%s", extension, temp);
 
-	printf("oldpath : %s\n", oldpath);
-	printf("newpath : %s\n", newpath);
+	//printf("oldpath : %s\n", oldpath);
+	//printf("newpath : %s\n", newpath);
 
 
 	rename(oldpath, newpath);
@@ -129,14 +137,18 @@ int main(int argc, char const *argv[]){
 					sprintf(fullPath,"%s/%s", workdir,ls->d_name);
 					isDir = opendir(fullPath);
 					if(!isDir){
-						//printf("%s\n", fullPath);
+						printf("%s\n", fullPath);
 						if(pthread_create( &tid[counter], NULL, categorize, (void*) fullPath) != 0){
 							printf("Cannot create thread\n");
 						}
+						++counter;
 					}
 					closedir(isDir);
 				}
-			sleep(3);
+			}
+
+			for(int i=0; i<counter; i++){
+				pthread_join(tid[i], NULL);
 			}
 		}
 		closedir(directory);
@@ -149,13 +161,15 @@ int main(int argc, char const *argv[]){
 
 		int counter = 1;
 		if(directory){
+			char cwd[1024];
+			getcwd(cwd, sizeof(cwd));
 			while(ls = readdir(directory)){
 				if(strcmp(ls->d_name, ".") && strcmp(ls->d_name, "..")){
 					char fullPath[1024];
-					sprintf(fullPath,"%s/%s", workdir,ls->d_name);
+					sprintf(fullPath,"%s/%s", cwd,ls->d_name);
 					isDir = opendir(fullPath);
-					if(!isDir){
-						//printf("%s\n", fullPath);
+					if(isDir == NULL){
+						printf("%s\n", fullPath);
 						++counter;
 					}
 					closedir(isDir);
@@ -171,32 +185,49 @@ int main(int argc, char const *argv[]){
 			while(ls = readdir(directory)){
 				if(strcmp(ls->d_name, ".") && strcmp(ls->d_name, "..")){
 					char fullPath[1024];
-					sprintf(fullPath,"%s/%s", workdir,ls->d_name);
+					sprintf(fullPath,"%s/%s", cwd,ls->d_name);
 					isDir = opendir(fullPath);
 					if(!isDir){
 						printf("%s\n", fullPath);
 						if(pthread_create( &tid[counter], NULL, categorize, (void*) fullPath) != 0){
 							printf("Cannot create thread\n");
 						}
+						pthread_join(tid[counter], NULL);
+						++counter;
 					}
 					closedir(isDir);
 				}
-			sleep(3);
 			}
 		}
 		closedir(directory);
 	}
 	else if(argc > 2 && !strcmp(argv[1], "-f")){
+		
 		pthread_t tid[argc];
 		for(int i=2; i < argc; ++i){
-			FILE* directory= fopen(argv[i], "r");
-			if(directory){
-				printf("%s\n", argv[i]);
-				if(pthread_create( &tid[i-2], NULL, categorize, (void*) argv[i]) != 0){
+			if(is_file(argv[i])){
+				char fullPath[1024];
+		
+				char* path1 = strdup(argv[i]);
+				char* path2 = strdup(argv[i]);
+
+				char* dir = dirname(path1);
+				char* filename = basename(path2);
+
+				chdir(dir);
+				char cwd[1024];
+				getcwd(cwd, sizeof(cwd));
+
+				sprintf(fullPath, "%s/%s",cwd, filename);
+				//printf("ini cwd %s\n", filename);
+
+
+				if(pthread_create(&tid[i], NULL, categorize, (void*) fullPath) != 0){
 					printf("Cannot create thread\n");
 				}
+				pthread_join(tid[i], NULL);
 			}
-			fclose(directory);
+			else printf("Cuih\n");
 		}
 	}	
 	return 0;
