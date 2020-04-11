@@ -5,8 +5,160 @@ No2. Baru sampai login dan register
 No3. Belum selesai baru yang argumen *  
 No4. Belum ada kendala
 
-## Soal 3
+## Soal 2
 
+Pada soal 2 terdapat code yaitu untuk server dan client.
+- Untuk Client
+Pada client awalnya dilakukan koneksi ke server, bila berhasil kemudian diinisialisasi screen menjadi 1 menunjukkan saat ini berada pada screen 1 dengan auth "Belum Login".
+```
+int fd;
+SetSocketBlockingEnabled(fd, true);
+
+struct sockaddr_in address;
+struct sockaddr_in serv_addr;
+        
+char charbuffer[1024] = {0};
+char input[256];
+
+if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+  printf("\n Socket creation error \n");
+  return -1;
+}
+
+memset(&serv_addr, '0', sizeof(serv_addr));
+serv_addr.sin_family = AF_INET;
+serv_addr.sin_port = htons(PORT);
+
+if(inet_pton(AF_INET, "127.0.0.1" , &serv_addr.sin_addr)<=0) {
+  printf("\nInvalid address/ Address not supported \n");
+  return -1;
+}
+   
+
+if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+  printf("\nConnection Failed \n");
+  return -1;
+}
+
+char auth[256];
+strcpy(auth, "Belum Login");
+
+int screen = 1;
+
+```
+Kemudian pada screen 1 terdapat dua jenis pilihan yaitu login dan register. Untuk keduanya sama-sama mengambil 2 input yaitu Username dan Pasword yang nantinya akan dikirimkan ke server sesuai requestnya. Untuk login terdapat tambahan untuk melakukan read auth dari server sebagai berikut.
+```
+memset(auth, '\0', sizeof(auth));
+read(sock, auth, 256);
+if(!strcmp(auth, "authSuccess")){
+	screen = 2;
+	continue;
+}
+```
+Pada potongan kode diatas, apabila login sukses maka akan beralih ke screen 2 apabila gagal maka kembali ke screen 1 dan karena isi auth saat ini adalah "authFailed" maka akan mencetak "Login Gagal!"
+```
+printf("\033c"); // Untuk melakukan clear screen
+if(!strcmp(auth, "authFailed")) printf("Login Gagal!\n");
+...
+```
+Pada screen 2 terdapat 2 pilihan juga yaitu find dan logout, untuk logout maka tinggal merubah auth menjadi "Belum Login" dan kembali ke screen 1.
+```
+if(!strcmp(input, "logout\n")){
+	strcpy(auth, "Belum Login");
+	screen = 1;
+	continue;
+}
+```
+Sedangkan pada find maka akan mengirimkan request pada server. Karena secara default read akan menunggu hingga mendapat jawaban dari server (karena secara default ter-block) maka bisa digunakan untuk menunggu game hingga mulai.
+```
+...
+strcpy(charbuffer, "findPlayer");
+send(sock, charbuffer, strlen(charbuffer), 0);
+
+printf("\033c");
+printf("Waiting for player ...\n");
+
+read(sock, status, 256);
+```
+Ketika server telah membalas, maka tandanya game telah dimulai. Dan karena client harus dapat mengirim serta menerima request/status terhadap server maka dibuatlah thread. Thread tersebut merujuk pada read dari server sedangkan pada process utama berfungsi untuk melakukan scan pada input dan mengirimkan pada server.  
+```
+pthread_t tid;
+pthread_create(&tid, NULL, readStatus, NULL);
+```
+Pada fungsi readStatus akan terus membaca status yang diberikan dari server hingga berubah menjadi Win atau Lose. Karena pada server nantinya menang dan kalah bisa dikirim oleh thread yang mengurusi lawan maka agar tidak terjadi error dikirim kembali ke server status game over agar status win tidak berubah menjadi lose (pada server setelah ada pemenang, healt akan diset menjadi 0 kembali sehingga bisa saja setelah thread mengirimkan status win, thread pada lawan mengirim status lose karena pada thread yang satunya health telah di set 0).
+```
+void* readStatus(void* argument){
+    char *gameover = "gameover";
+    while(!(!strcmp(status, "Win") || !strcmp(status, "Lose"))){
+        memset(status, '\0', sizeof(status));
+        read(sock, status, 256);
+        printf("-Health %s-\n", status);
+        if(!strcmp(status,"Win")){
+            send(sock, gameover, strlen(gameover), 0);
+            break;
+        }
+        if(!strcmp(status, "Lose")){
+            send(sock, gameover, strlen(gameover), 0);
+            break;
+        }
+    }
+}
+```
+Pada main, while akan berhenti ketika terjadi status win atau lose. Karena getchar secara default melakukan block, maka diset dulu fd menjadi nonblock agar ketika status berubah tidak perlu menunggu input dari user. Untuk merubah dari block ke nonblock dan sebaliknya digunakan SetSocketBlockingEnabled() sebagai berikut
+```
+bool SetSocketBlockingEnabled(int fd, bool blocking)
+{
+    if (fd < 0) return false;
+
+   int flags = fcntl(fd, F_GETFL, 0);
+   if (flags == -1) return false;
+   flags = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
+   return (fcntl(fd, F_SETFL, flags) == 0) ? true : false;
+}
+```
+Sedangkan karena input pada program client tidak perlu menekan enter(secara default, buffer harus ditekan enter untuk melakukan flush), maka sebelumnya diset pada STDIN_FILENO sebagai berikut
+```
+void setNewAttr(void){
+    int c = 0;
+    int res = 0;
+    res = tcgetattr(STDIN_FILENO, &org_opts);
+    assert(res==0);
+
+    memcpy(&new_opts, &org_opts, sizeof(new_opts));
+    new_opts.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHOK | ECHONL | ECHOPRT | ECHOKE | ICRNL);
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_opts);
+}
+```
+Untuk mengembalikannya sebagai berikut.
+```
+void returnAttr(void){
+    int res;
+    res=tcsetattr(STDIN_FILENO, TCSANOW, &org_opts);
+    assert(res==0);
+}
+```
+Secara keseluruhan, program inputnya sebagai berikut.
+```
+setNewAttr();
+while(!(!strcmp(status, "Win") || !strcmp(status, "Lose"))){
+	SetSocketBlockingEnabled(fd, false);
+	char c = getchar();
+	SetSocketBlockingEnabled(fd, true);
+	
+	if(c == ' ' && !(!strcmp(status, "Win") || !strcmp(status, "Lose"))){
+		printf("HIT!!\n");
+		send(sock, &c, 1, 0);
+	}
+}
+returnAttr();
+		
+```
+
+
+
+- Untuk Server
+
+## Soal 3
 
 Pada soal ke 3 terdapat 3 argument yang digunakan yaitu * untuk mengkategorikan file pada current working directory, -d [path] untuk mengkategorikan pada directory yang digunakan dan -f [file+1] [file_2] ... [file_n] untuk mengkategorikan file satu per satu.  
 - Argument *  
