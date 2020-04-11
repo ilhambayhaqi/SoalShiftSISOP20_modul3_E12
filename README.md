@@ -521,3 +521,79 @@ rename(oldpath, newpath);
 ```
 
 ## Soal 4
+### 4a. Perkalian matrix
+Pada awalnya matriks didefinisikan secara manual pada source code, kemudian dibuat thread untuk melakukan perkalian untuk setiap elemen pada matrix res (sejumlah baris dan kolom pada res), fungsi perkaliannya sebagai berikut. Agar mudah maka tiap matrix dideklarasikan pada variabel global. Untuk fungsi perkaliannya sebagai berikut.
+```
+void *multiply(void *arg){
+	idku *hehe = (idku*)arg;
+	int idx = hehe->idx;
+	int idy = hehe->idy;
+	int temp = 0;
+	//printf("%d %d\n", idx, idy);
+	
+	for(int i=0; i<col1; i++) 
+		temp += mat1[idy][i]*mat2[i][idx];
+
+	hehe->res = temp;
+	return NULL;
+}
+```
+Agar hasil dapat dipakai untuk soal 4b, maka di buat shared memory sebanyak memori pada res. Untuk codenya sebagai berikut.
+```
+key_t key = 1234;
+int shmid = shmget(key, sizeof(int[row1][col2]), IPC_CREAT | 0666);
+int (*shmres)[row1] = shmat(shmid, 0,0);
+
+for(int i=0; i < row1; i++){
+	for (int j = 0; j < col2; j++){
+		pthread_join(tid[i][j], NULL);
+		printf("%3d ", hehe[i][j].res);
+		shmres[i][j] = hehe[i][j].res;
+	}
+	printf("\n");
+}
+```
+### 4b. Deret tiap elemen matrix
+Inti dari soal ini hampir sama dengan 4a, hanya saja input berasal dari shared memory yang telah dibuat sebelumnya.
+```
+key_t key = 1234;
+int shmid = shmget(key, sizeof(int[row1][col2]), IPC_CREAT | 0666);
+int (*shmres)[row1] = shmat(shmid, 0,0);
+```
+Dan kemudian untuk tiap elemen pada matrix dibuatkan thread dengan fungsi penjumlahan dari 1 hingga n, n merupakan nilai pada elemen matrix tersebut. Untuk fungsinya sebagai berikut.
+```
+void *sum(void *arg){
+	idku *hehe = (idku*)arg;
+	int val = hehe->val;
+	int temp = 0;
+	
+	for(int i=1; i<=val; i++) 
+		temp += i;
+
+	hehe->res = temp;
+	return NULL;
+}
+```
+
+### 4c. PIPE
+Pada soal ini disuruh untuk membuat program yang mirip dengan ls | wc -l menggunakan pipe. Yang dilakukan adalah menggunakan fork() dan untuk fork ls STDOUT akan didup pada fd[1] dan fd[0] atau input akan ditutup.
+```
+    if(child_id > 0) { 
+
+        dup2(fd[1], STDOUT_FILENO); 
+        close(fd[0]); 
+        
+        char *arg[] = {"ls", NULL};
+        execv("/bin/ls", arg); 
+    } 
+```
+Sedangkan untuk wc, STDIN akan didup pada fd[0] dan fd[1] diclose.
+```
+    else{ 
+        dup2(fd[0], STDIN_FILENO); 
+        close(fd[1]); 
+        
+        char *arg[] = {"wc", "-l", NULL};
+        execv("/usr/bin/wc", arg); 
+    }
+ ```
